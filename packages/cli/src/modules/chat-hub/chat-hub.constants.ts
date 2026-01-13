@@ -131,7 +131,7 @@ const MODEL_METADATA_REGISTRY: Partial<
 			inputModalities: ['text', 'image'],
 		},
 		'claude-haiku-4-5-20251001': {
-			inputModalities: ['text', 'image'],
+			inputModalities: ['text', 'image', 'file'],
 		},
 		'claude-opus-4-20250514': {
 			inputModalities: ['text', 'image'],

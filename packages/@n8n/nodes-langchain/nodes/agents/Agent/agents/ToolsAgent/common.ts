@@ -1,6 +1,6 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage } from '@langchain/core/messages';
-import type { BaseMessage } from '@langchain/core/messages';
+import type { BaseMessage, ContentBlock } from '@langchain/core/messages';
 import { ChatPromptTemplate, type BaseMessagePromptTemplateLike } from '@langchain/core/prompts';
 import type { AgentAction, AgentFinish } from '@langchain/classic/agents';
 import type { ToolsAgentAction } from '@langchain/classic/dist/agents/tool_calling/output_parser';
@@ -49,6 +49,10 @@ function isImageFile(mimeType: string): boolean {
 	return mimeType.startsWith('image/');
 }
 
+function isDocumentFile(mimeType: string): boolean {
+	return mimeType === 'application/pdf';
+}
+
 /**
  * Extracts binary messages (images and text files) from the input data.
  * When operating in filesystem mode, the binary stream is first converted to a buffer.
@@ -68,8 +72,7 @@ export async function extractBinaryMessages(
 	const binaryMessages = await Promise.all(
 		Object.values(binaryData)
 			// select only the files we can process
-			.filter((data) => isImageFile(data.mimeType) || isTextFile(data.mimeType))
-			.map(async (data) => {
+			.flatMap<Promise<ContentBlock[]>>(async (data) => {
 				// Handle images
 				if (isImageFile(data.mimeType)) {
 					let binaryUrlString: string;
@@ -88,15 +91,17 @@ export async function extractBinaryMessages(
 							: `data:${data.mimeType};base64,${data.data}`;
 					}
 
-					return {
-						type: 'image_url',
-						image_url: {
-							url: binaryUrlString,
+					return [
+						{
+							type: 'image_url',
+							image_url: {
+								url: binaryUrlString,
+							},
 						},
-					};
+					];
 				}
-				// Handle text files
-				else {
+
+				if (isTextFile(data.mimeType)) {
 					let textContent: string;
 					if (data.id) {
 						const binaryBuffer = await ctx.helpers.binaryToBuffer(
@@ -114,15 +119,37 @@ export async function extractBinaryMessages(
 						}
 					}
 
-					return {
-						type: 'text',
-						text: `File: ${data.fileName ?? 'attachment'}\nContent:\n${textContent}`,
-					};
+					return [
+						{
+							type: 'text',
+							text: `File: ${data.fileName ?? 'attachment'}\nContent:\n${textContent}`,
+						},
+					];
 				}
+
+				if (isDocumentFile(data.mimeType)) {
+					const bufferData = data.id
+						? await ctx.helpers.binaryToBuffer(await ctx.helpers.getBinaryStream(data.id))
+						: data.data.replace(/^base64,/, '');
+
+					return [
+						{
+							type: 'document',
+							source: {
+								type: 'base64',
+								media_type: data.mimeType,
+								data: bufferData.toString('base64'),
+							},
+						},
+					];
+				}
+
+				ctx.logger.debug(`Unsupported mime type: ${data.mimeType}`);
+				return [];
 			}),
 	);
 	return new HumanMessage({
-		content: [...binaryMessages],
+		content: [...binaryMessages.flat()],
 	});
 }
 

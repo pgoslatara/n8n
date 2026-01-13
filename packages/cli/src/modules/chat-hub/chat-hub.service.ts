@@ -1429,7 +1429,7 @@ export class ChatHubService {
 			);
 		} finally {
 			if (model.provider !== 'n8n') {
-				await this.deleteChatWorkflow(workflowData.id);
+				//await this.deleteChatWorkflow(workflowData.id);
 			}
 		}
 	}
