@@ -220,6 +220,7 @@ export class ChatHubService {
 					tools,
 					processedAttachments,
 					tz,
+					messageId,
 					trx,
 				);
 			});
@@ -383,6 +384,7 @@ export class ChatHubService {
 						session.tools,
 						attachments,
 						tz,
+						payload.messageId,
 						trx,
 					);
 				}
@@ -469,6 +471,7 @@ export class ChatHubService {
 					session.tools,
 					attachments,
 					tz,
+					lastHumanMessage.id,
 					trx,
 				);
 
@@ -502,6 +505,7 @@ export class ChatHubService {
 		tools: INode[],
 		attachments: IBinaryData[],
 		timeZone: string,
+		humanMessageId: string,
 		trx: EntityManager,
 	) {
 		if (model.provider === 'n8n') {
@@ -511,6 +515,7 @@ export class ChatHubService {
 				model.workflowId,
 				message,
 				attachments,
+				humanMessageId,
 				trx,
 			);
 		}
@@ -639,6 +644,7 @@ export class ChatHubService {
 		workflowId: string,
 		message: string,
 		attachments: IBinaryData[],
+		humanMessageId: string,
 		trx: EntityManager,
 	) {
 		const workflow = await this.workflowFinderService.findWorkflowForUser(
@@ -721,9 +727,25 @@ export class ChatHubService {
 			},
 		});
 
+		// Inject parentMessageId into any MemoryChatHub nodes so they can link
+		// memory entries to the human message that triggered this execution
+		const MEMORY_CHAT_HUB_NODE_TYPE = '@n8n/n8n-nodes-langchain.memoryChatHub';
+		const nodes = workflow.activeVersion.nodes.map((node) => {
+			if (node.type === MEMORY_CHAT_HUB_NODE_TYPE) {
+				return {
+					...node,
+					parameters: {
+						...node.parameters,
+						parentMessageId: humanMessageId,
+					},
+				};
+			}
+			return node;
+		});
+
 		const workflowData: IWorkflowBase = {
 			...workflow,
-			nodes: workflow.activeVersion.nodes,
+			nodes,
 			connections: workflow.activeVersion.connections,
 			// Force saving data on successful executions for custom agent workflows
 			// to be able to read the results after execution.
