@@ -1,4 +1,7 @@
 import { BufferWindowMemory } from '@langchain/classic/memory';
+import { getSessionId } from '@utils/helpers';
+import { logWrapper } from '@utils/logWrapper';
+import { getConnectionHintNoticeField } from '@utils/sharedFields';
 import {
 	NodeConnectionTypes,
 	NodeOperationError,
@@ -8,17 +11,12 @@ import {
 	type SupplyData,
 } from 'n8n-workflow';
 
-import { getSessionId } from '@utils/helpers';
-import { logWrapper } from '@utils/logWrapper';
-import { getConnectionHintNoticeField } from '@utils/sharedFields';
-
 import {
 	sessionIdOption,
 	sessionKeyProperty,
 	contextWindowLengthProperty,
 	expressionSessionKeyProperty,
 } from '../descriptions';
-
 import { ChatHubMessageHistory } from './ChatHubMessageHistory';
 
 export class MemoryChatHub implements INodeType {
@@ -29,7 +27,7 @@ export class MemoryChatHub implements INodeType {
 		iconColor: 'blue',
 		group: ['transform'],
 		version: 1,
-		description: 'Stores chat history in n8n Chat Hub for persistent conversations',
+		description: 'Stores chat memory in n8n Chat Hub for persistent conversations',
 		defaults: {
 			name: 'Chat Hub Memory',
 		},
@@ -54,7 +52,7 @@ export class MemoryChatHub implements INodeType {
 			getConnectionHintNoticeField([NodeConnectionTypes.AiAgent]),
 			{
 				displayName:
-					'This memory stores conversations in n8n Chat Hub, enabling persistent chat history with support for edit/retry branching.',
+					"This memory stores conversations in n8n's local database, enabling simple persistent chat memory with support for Chat Hub's message edits and retries.",
 				name: 'chatHubNotice',
 				type: 'notice',
 				default: '',
@@ -88,18 +86,6 @@ export class MemoryChatHub implements INodeType {
 						default: true,
 						description: 'Whether to automatically create a Chat Hub session if one does not exist',
 					},
-					{
-						displayName: 'Session Title',
-						name: 'sessionTitle',
-						type: 'string',
-						default: 'Workflow Chat',
-						description: 'Title for auto-created sessions',
-						displayOptions: {
-							show: {
-								autoCreateSession: [true],
-							},
-						},
-					},
 				],
 			},
 		],
@@ -111,7 +97,6 @@ export class MemoryChatHub implements INodeType {
 		const turnId = (this.getNodeParameter('turnId', itemIndex, '') as string) || null;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
 			autoCreateSession?: boolean;
-			sessionTitle?: string;
 		};
 
 		// Get the node's internal ID to use as memoryNodeId
@@ -133,7 +118,7 @@ export class MemoryChatHub implements INodeType {
 
 		// Auto-create session if needed
 		if (options.autoCreateSession !== false) {
-			await memoryService.ensureSession(options.sessionTitle);
+			await memoryService.ensureSession();
 		}
 
 		const chatHistory = new ChatHubMessageHistory({
