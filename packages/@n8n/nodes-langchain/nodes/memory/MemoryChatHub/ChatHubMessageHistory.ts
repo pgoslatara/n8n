@@ -1,7 +1,17 @@
 import { BaseChatMessageHistory } from '@langchain/core/chat_history';
-import type { BaseMessage } from '@langchain/core/messages';
+import type { BaseMessage, ToolCall } from '@langchain/core/messages';
 import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import type { IChatHubMemoryService, ChatHubMemoryEntry } from 'n8n-workflow';
+
+/**
+ * Structure for storing AI messages that include tool calls.
+ * When an AI message has tool_calls, we serialize it as JSON including both
+ * the content and the tool_calls array, so they can be properly reconstructed.
+ */
+interface StoredAIMessageWithToolCalls {
+	content: string;
+	toolCalls: ToolCall[];
+}
 
 /**
  * LangChain message history implementation that uses n8n's Chat Hub memory.
@@ -29,8 +39,14 @@ export class ChatHubMessageHistory extends BaseChatMessageHistory {
 			case 'human':
 				return new HumanMessage({ content: entry.content, name: entry.name ?? undefined });
 
-			case 'ai':
-				return new AIMessage({ content: entry.content, name: entry.name ?? undefined });
+			case 'ai': {
+				const aiData = this.parseAIMessageContent(entry.content);
+				return new AIMessage({
+					content: aiData.content,
+					name: entry.name ?? undefined,
+					tool_calls: aiData.toolCalls,
+				});
+			}
 
 			case 'system':
 				return new SystemMessage({ content: entry.content });
@@ -48,6 +64,23 @@ export class ChatHubMessageHistory extends BaseChatMessageHistory {
 			default:
 				// Unknown role treated as system
 				return new SystemMessage({ content: entry.content });
+		}
+	}
+
+	/**
+	 * Parse AI message content stored as JSON: { content: "...", toolCalls: [...] }
+	 */
+	private parseAIMessageContent(content: string): { content: string; toolCalls: ToolCall[] } {
+		try {
+			const parsed = JSON.parse(content) as StoredAIMessageWithToolCalls;
+			return {
+				content:
+					typeof parsed.content === 'string' ? parsed.content : JSON.stringify(parsed.content),
+				toolCalls: parsed.toolCalls ?? [],
+			};
+		} catch {
+			// Fallback for malformed data
+			return { content, toolCalls: [] };
 		}
 	}
 
@@ -78,7 +111,14 @@ export class ChatHubMessageHistory extends BaseChatMessageHistory {
 		if (messageType === 'human') {
 			await this.memoryService.addHumanMessage(content);
 		} else if (messageType === 'ai') {
-			await this.memoryService.addAIMessage(content);
+			const aiMsg = message as AIMessage;
+			// Store AI messages as JSON with content and tool_calls
+			// This ensures ToolMessages can be properly matched when reconstructing history
+			const storedContent: StoredAIMessageWithToolCalls = {
+				content,
+				toolCalls: aiMsg.tool_calls ?? [],
+			};
+			await this.memoryService.addAIMessage(JSON.stringify(storedContent));
 		} else if (messageType === 'tool') {
 			const toolMsg = message as ToolMessage;
 			await this.memoryService.addToolMessage(
