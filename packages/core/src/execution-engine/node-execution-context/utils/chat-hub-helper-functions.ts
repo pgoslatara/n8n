@@ -17,6 +17,7 @@ export function getChatHubHelperFunctions(
 			sessionId: string,
 			memoryNodeId: string,
 			parentMessageId: string | null,
+			excludeCurrentFromMemory: boolean,
 		) =>
 			await chatHubProxyProvider.getChatHubProxy(
 				workflow,
@@ -24,6 +25,7 @@ export function getChatHubHelperFunctions(
 				sessionId,
 				memoryNodeId,
 				parentMessageId,
+				excludeCurrentFromMemory,
 				additionalData.userId,
 			),
 	};

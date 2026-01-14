@@ -1002,6 +1002,7 @@ export type ChatHubProxyProvider = {
 		sessionId: string,
 		memoryNodeId: string,
 		parentMessageId: string | null,
+		excludeCurrentFromMemory: boolean,
 		ownerId?: string,
 	): Promise<IChatHubMemoryService>;
 };
@@ -1012,6 +1013,7 @@ export type ChatHubProxyFunctions = {
 		sessionId: string,
 		memoryNodeId: string,
 		parentMessageId: string | null,
+		excludeCurrentFromMemory: boolean,
 	): Promise<IChatHubMemoryService>;
 };
 

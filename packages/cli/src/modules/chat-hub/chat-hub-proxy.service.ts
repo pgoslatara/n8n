@@ -46,6 +46,7 @@ export class ChatHubProxyService implements ChatHubProxyProvider {
 		sessionId: string,
 		memoryNodeId: string,
 		parentMessageId: string | null,
+		excludeCurrentFromMemory: boolean,
 		ownerId?: string,
 	): Promise<IChatHubMemoryService> {
 		this.validateRequest(node);
@@ -64,6 +65,7 @@ export class ChatHubProxyService implements ChatHubProxyProvider {
 			sessionId,
 			memoryNodeId,
 			parentMessageId,
+			excludeCurrentFromMemory,
 			ownerId,
 			workflowId,
 			agentName,
@@ -99,6 +101,7 @@ export class ChatHubProxyService implements ChatHubProxyProvider {
 		sessionId: string,
 		memoryNodeId: string,
 		initialParentMessageId: string | null,
+		excludeCurrentFromMemory: boolean,
 		ownerId: string,
 		workflowId: string | undefined,
 		agentName: string,
@@ -167,10 +170,30 @@ export class ChatHubProxyService implements ChatHubProxyProvider {
 					// These are the parent message IDs we should filter memory by
 					const humanMessageIds = extractHumanMessageIds(messageChain);
 
-					// Include the current parentMessageId if it's not already in the chain
-					// (it should be, but just in case)
-					if (!humanMessageIds.includes(parentMessageId)) {
-						humanMessageIds.push(parentMessageId);
+					// For regeneration, exclude the current parentMessageId from the lookup
+					// since we don't want memory from the execution we're regenerating
+					if (excludeCurrentFromMemory) {
+						const index = humanMessageIds.indexOf(parentMessageId);
+						if (index !== -1) {
+							humanMessageIds.splice(index, 1);
+						}
+						logger.debug('Excluding current parentMessageId from memory lookup (regeneration)', {
+							sessionId,
+							memoryNodeId,
+							parentMessageId,
+							humanMessageIds,
+						});
+					} else {
+						// Include the current parentMessageId if it's not already in the chain
+						// (it should be, but just in case)
+						if (!humanMessageIds.includes(parentMessageId)) {
+							humanMessageIds.push(parentMessageId);
+						}
+					}
+
+					// If no human message IDs remain after exclusion, return empty memory
+					if (humanMessageIds.length === 0) {
+						return [];
 					}
 
 					// Load memory entries for this node filtered by the human message chain

@@ -67,15 +67,18 @@ export class MemoryChatHub implements INodeType {
 				// Hidden parameter for parentMessageId - injected by Chat Hub service
 				displayName: 'Parent Message ID',
 				name: 'parentMessageId',
-				type: 'string',
+				type: 'hidden',
 				default: '',
 				description: 'ID of the parent message that triggered this execution (set by Chat Hub)',
-				displayOptions: {
-					show: {
-						// Never show this in the UI - it's set programmatically by Chat Hub
-						'@version': [-1],
-					},
-				},
+			},
+			{
+				// Hidden parameter for excludeCurrentFromMemory - injected by Chat Hub service for regeneration
+				displayName: 'Exclude Current From Memory',
+				name: 'excludeCurrentFromMemory',
+				type: 'hidden',
+				default: false,
+				description:
+					'Whether to exclude memory entries from the current parentMessageId (used for regeneration)',
 			},
 			{
 				displayName: 'Options',
@@ -113,6 +116,11 @@ export class MemoryChatHub implements INodeType {
 		const contextWindowLength = this.getNodeParameter('contextWindowLength', itemIndex) as number;
 		const parentMessageId =
 			(this.getNodeParameter('parentMessageId', itemIndex, '') as string) || null;
+		const excludeCurrentFromMemory = this.getNodeParameter(
+			'excludeCurrentFromMemory',
+			itemIndex,
+			false,
+		) as boolean;
 		const options = this.getNodeParameter('options', itemIndex, {}) as {
 			autoCreateSession?: boolean;
 			sessionTitle?: string;
@@ -124,10 +132,12 @@ export class MemoryChatHub implements INodeType {
 
 		// Get the Chat Hub proxy
 		// parentMessageId may be null for manual executions - proxy will look up latest message
+		// excludeCurrentFromMemory is true for regeneration - excludes memory from the current parentMessageId
 		const memoryService = await this.helpers.getChatHubProxy?.(
 			sessionId,
 			memoryNodeId,
 			parentMessageId,
+			excludeCurrentFromMemory,
 		);
 
 		if (!memoryService) {

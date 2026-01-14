@@ -221,6 +221,7 @@ export class ChatHubService {
 					processedAttachments,
 					tz,
 					messageId,
+					false, // isRegeneration
 					trx,
 				);
 			});
@@ -385,6 +386,7 @@ export class ChatHubService {
 						attachments,
 						tz,
 						payload.messageId,
+						false, // isRegeneration
 						trx,
 					);
 				}
@@ -472,6 +474,7 @@ export class ChatHubService {
 					attachments,
 					tz,
 					lastHumanMessage.id,
+					true, // isRegeneration - exclude memory from the message we're regenerating
 					trx,
 				);
 
@@ -506,6 +509,7 @@ export class ChatHubService {
 		attachments: IBinaryData[],
 		timeZone: string,
 		humanMessageId: string,
+		isRegeneration: boolean,
 		trx: EntityManager,
 	) {
 		if (model.provider === 'n8n') {
@@ -516,6 +520,7 @@ export class ChatHubService {
 				message,
 				attachments,
 				humanMessageId,
+				isRegeneration,
 				trx,
 			);
 		}
@@ -645,6 +650,7 @@ export class ChatHubService {
 		message: string,
 		attachments: IBinaryData[],
 		humanMessageId: string,
+		isRegeneration: boolean,
 		trx: EntityManager,
 	) {
 		const workflow = await this.workflowFinderService.findWorkflowForUser(
@@ -727,8 +733,9 @@ export class ChatHubService {
 			},
 		});
 
-		// Inject parentMessageId into any MemoryChatHub nodes so they can link
-		// memory entries to the human message that triggered this execution
+		// Inject parentMessageId and excludeCurrentFromMemory into any MemoryChatHub nodes
+		// - parentMessageId: links memory entries to the human message that triggered this execution
+		// - excludeCurrentFromMemory: true for regeneration, excludes memory from the message being regenerated
 		const MEMORY_CHAT_HUB_NODE_TYPE = '@n8n/n8n-nodes-langchain.memoryChatHub';
 		const nodes = workflow.activeVersion.nodes.map((node) => {
 			if (node.type === MEMORY_CHAT_HUB_NODE_TYPE) {
@@ -737,6 +744,7 @@ export class ChatHubService {
 					parameters: {
 						...node.parameters,
 						parentMessageId: humanMessageId,
+						excludeCurrentFromMemory: isRegeneration,
 					},
 				};
 			}
