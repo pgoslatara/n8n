@@ -131,6 +131,7 @@ import { AddIconToAgentTable1765788427674 } from '../common/1765788427674-AddIco
 import { AddAgentIdForeignKeys1765886667897 } from '../common/1765886667897-AddAgentIdForeignKeys';
 import { AddWorkflowVersionIdToExecutionData1765892199653 } from '../common/1765892199653-AddVersionIdToExecutionData';
 import { AddWorkflowPublishScopeToProjectRoles1766064542000 } from '../common/1766064542000-AddWorkflowPublishScopeToProjectRoles';
+import { AddCredentialUseScopeToRoles1768475341537 } from '../common/1768475341537-AddCredentialUseScopeToRoles';
 import { AddChatMessageIndices1766068346315 } from '../common/1766068346315-AddChatMessageIndices';
 import type { Migration } from '../migration-types';
 
@@ -268,5 +269,6 @@ export const postgresMigrations: Migration[] = [
 	AddWorkflowVersionIdToExecutionData1765892199653,
 	AddWorkflowPublishScopeToProjectRoles1766064542000,
 	AddChatMessageIndices1766068346315,
+	AddCredentialUseScopeToRoles1768475341537,
 	ExpandInsightsWorkflowIdLength1766500000000,
 ];

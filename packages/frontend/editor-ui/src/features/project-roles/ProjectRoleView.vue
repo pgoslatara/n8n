@@ -95,7 +95,7 @@ const folder = (['read', 'update', 'create', 'move', 'delete'] as const).map(
 const workflow = (['read', 'update', 'create', 'publish', 'move', 'delete'] as const).map(
 	(action) => `workflow:${action}` as const,
 );
-const credential = (['read', 'update', 'create', 'share', 'move', 'delete'] as const).map(
+const credential = (['read', 'use', 'update', 'create', 'share', 'move', 'delete'] as const).map(
 	(action) => `credential:${action}` as const,
 );
 const sourceControl = (['push'] as const).map((action) => `sourceControl:${action}` as const);
@@ -143,6 +143,21 @@ function toggleScope(scope: string) {
 
 	if (scope.endsWith(':read')) {
 		toggleScope(scope.replace(':read', ':list'));
+	}
+
+	if (scope === 'credential:use') {
+		// If enabling use, also enable read (you need to view to use)
+		if (index === -1 && !form.value.scopes.includes('credential:read')) {
+			form.value.scopes.push('credential:read');
+		}
+	}
+
+	if (scope === 'credential:read') {
+		// If disabling read, also disable use (you can't use without viewing)
+		if (index !== -1 && form.value.scopes.includes('credential:use')) {
+			const useIndex = form.value.scopes.indexOf('credential:use');
+			form.value.scopes.splice(useIndex, 1);
+		}
 	}
 
 	if (scope === 'workflow:update') {

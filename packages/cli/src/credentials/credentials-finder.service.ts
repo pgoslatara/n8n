@@ -31,10 +31,12 @@ export class CredentialsFinderService {
 
 	/**
 	 * Checks if the scopes allow read-only access to global credentials.
-	 * Global credentials can be accessed with credential:read scope only.
+	 * Global credentials can be accessed with credential:read or credential:use scope.
 	 */
 	hasGlobalReadOnlyAccess(scopes: Scope[]): boolean {
-		return scopes.length === 1 && scopes[0] === 'credential:read';
+		return (
+			scopes.length === 1 && (scopes[0] === 'credential:read' || scopes[0] === 'credential:use')
+		);
 	}
 
 	/**
@@ -86,10 +88,22 @@ export class CredentialsFinderService {
 		let where: FindOptionsWhere<CredentialsEntity> = { isGlobal: false };
 
 		if (!hasGlobalScope(user, scopes, { mode: 'allOf' })) {
-			const [projectRoles, credentialRoles] = await Promise.all([
+			// For viewing credentials, accept either credential:read or credential:use
+			// If scopes include credential:read, also check for credential:use (users with use can view)
+			const shouldCheckRead = scopes.includes('credential:read');
+			const shouldCheckUse = scopes.includes('credential:use') || shouldCheckRead;
+
+			const [projectRoles, credentialRolesRead, credentialRolesUse] = await Promise.all([
 				this.roleService.rolesWithScope('project', scopes),
-				this.roleService.rolesWithScope('credential', scopes),
+				shouldCheckRead
+					? this.roleService.rolesWithScope('credential', ['credential:read'])
+					: Promise.resolve([]),
+				shouldCheckUse
+					? this.roleService.rolesWithScope('credential', ['credential:use'])
+					: Promise.resolve([]),
 			]);
+			// Combine roles that have either credential:read or credential:use
+			const credentialRoles = [...new Set([...credentialRolesRead, ...credentialRolesUse])];
 			where = {
 				...where,
 				shared: {
@@ -109,7 +123,7 @@ export class CredentialsFinderService {
 			relations: { shared: true },
 		});
 
-		// Include global credentials only if the user has read-only access
+		// Include global credentials only if the user has read-only access (credential:read or credential:use)
 		if (this.hasGlobalReadOnlyAccess(scopes)) {
 			const globalCredentials = await this.fetchGlobalCredentials();
 			return [...credentials, ...globalCredentials];
@@ -127,10 +141,22 @@ export class CredentialsFinderService {
 		let where: FindOptionsWhere<SharedCredentials> = { credentialsId };
 
 		if (!hasGlobalScope(user, scopes, { mode: 'allOf' })) {
-			const [projectRoles, credentialRoles] = await Promise.all([
+			// For viewing credentials, accept either credential:read or credential:use
+			const viewingScopes = scopes.includes('credential:read')
+				? [...scopes.filter((s) => s !== 'credential:read'), 'credential:read', 'credential:use']
+				: scopes;
+
+			const [projectRoles, credentialRolesRead, credentialRolesUse] = await Promise.all([
 				this.roleService.rolesWithScope('project', scopes),
-				this.roleService.rolesWithScope('credential', scopes),
+				viewingScopes.includes('credential:read')
+					? this.roleService.rolesWithScope('credential', ['credential:read'])
+					: Promise.resolve([]),
+				viewingScopes.includes('credential:use')
+					? this.roleService.rolesWithScope('credential', ['credential:use'])
+					: Promise.resolve([]),
 			]);
+			// Combine roles that have either credential:read or credential:use
+			const credentialRoles = [...new Set([...credentialRolesRead, ...credentialRolesUse])];
 			where = {
 				...where,
 				role: In(credentialRoles),
@@ -177,10 +203,22 @@ export class CredentialsFinderService {
 		let where: FindOptionsWhere<SharedCredentials> = {};
 
 		if (!hasGlobalScope(user, scopes, { mode: 'allOf' })) {
-			const [projectRoles, credentialRoles] = await Promise.all([
+			// For viewing credentials, accept either credential:read or credential:use
+			const viewingScopes = scopes.includes('credential:read')
+				? [...scopes.filter((s) => s !== 'credential:read'), 'credential:read', 'credential:use']
+				: scopes;
+
+			const [projectRoles, credentialRolesRead, credentialRolesUse] = await Promise.all([
 				this.roleService.rolesWithScope('project', scopes),
-				this.roleService.rolesWithScope('credential', scopes),
+				viewingScopes.includes('credential:read')
+					? this.roleService.rolesWithScope('credential', ['credential:read'])
+					: Promise.resolve([]),
+				viewingScopes.includes('credential:use')
+					? this.roleService.rolesWithScope('credential', ['credential:use'])
+					: Promise.resolve([]),
 			]);
+			// Combine roles that have either credential:read or credential:use
+			const credentialRoles = [...new Set([...credentialRolesRead, ...credentialRolesUse])];
 			where = {
 				role: In(credentialRoles),
 				project: {
