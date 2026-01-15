@@ -1003,7 +1003,7 @@ export type ChatHubProxyProvider = {
 		memoryNodeId: string,
 		turnId: string | null,
 		ownerId?: string,
-	): Promise<IChatHubMemoryService>;
+	): IChatHubMemoryService;
 };
 
 export type ChatHubProxyFunctions = {
@@ -1012,7 +1012,7 @@ export type ChatHubProxyFunctions = {
 		sessionId: string,
 		memoryNodeId: string,
 		turnId: string | null,
-	): Promise<IChatHubMemoryService>;
+	): IChatHubMemoryService;
 };
 
 type BaseExecutionFunctions = FunctionsBaseWithRequiredKeys<'getMode'> & {

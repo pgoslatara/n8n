@@ -6,6 +6,10 @@ import {
 	ChatHubMemoryEntry,
 	INode,
 	Workflow,
+	UnexpectedError,
+	UserError,
+	CHAT_TRIGGER_NODE_TYPE,
+	CHAT_HUB_MEMORY_TYPE,
 } from 'n8n-workflow';
 import { v4 as uuid } from 'uuid';
 
@@ -15,7 +19,7 @@ import { ChatHubMemoryRepository } from './chat-hub-memory.repository';
 import { ChatHubMessageRepository } from './chat-message.repository';
 import { ChatHubSessionRepository } from './chat-session.repository';
 
-const ALLOWED_NODES = ['@n8n/n8n-nodes-langchain.memoryChatHub'] as const;
+const ALLOWED_NODES = [CHAT_HUB_MEMORY_TYPE] as const;
 const NAME_FALLBACK = 'Workflow Chat';
 
 type AllowedNode = (typeof ALLOWED_NODES)[number];
@@ -37,24 +41,22 @@ export class ChatHubProxyService implements ChatHubProxyProvider {
 
 	private validateRequest(node: INode) {
 		if (!isAllowedNode(node.type)) {
-			throw new Error('This proxy is only available for Chat Hub Memory nodes');
+			throw new UnexpectedError('This proxy is only available for Chat Hub Memory nodes');
 		}
 	}
 
-	async getChatHubProxy(
+	getChatHubProxy(
 		workflow: Workflow,
 		node: INode,
 		sessionId: string,
 		memoryNodeId: string,
 		turnId: string | null,
 		ownerId?: string,
-	): Promise<IChatHubMemoryService> {
+	): IChatHubMemoryService {
 		this.validateRequest(node);
 
 		if (!ownerId) {
-			throw new Error(
-				'Owner ID is required for Chat Hub Memory. For manual executions, ensure the user context is available.',
-			);
+			throw new UserError('Chat Hub Memory is only available on Chat hub and manual executions.');
 		}
 
 		// Extract workflow info for session creation
@@ -76,9 +78,8 @@ export class ChatHubProxyService implements ChatHubProxyProvider {
 	 * falling back to workflow name if not set.
 	 */
 	private extractAgentName(workflow: Workflow): string {
-		// Look for chat trigger node
 		const chatTriggerNode = Object.values(workflow.nodes).find(
-			(n) => n.type === '@n8n/n8n-nodes-langchain.chatTrigger',
+			(n) => n.type === CHAT_TRIGGER_NODE_TYPE,
 		);
 
 		if (
@@ -88,7 +89,6 @@ export class ChatHubProxyService implements ChatHubProxyProvider {
 			return String(chatTriggerNode.parameters.agentName);
 		}
 
-		// Fall back to workflow name or default
 		if (workflow.name && workflow.name.trim() !== '') {
 			return workflow.name;
 		}
